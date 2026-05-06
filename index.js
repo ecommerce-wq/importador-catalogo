@@ -3,23 +3,7 @@ const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args
 const SUPPLIER_BASE_URL = 'https://srv2.best-fashion.net';
 const SUPPLIER_TOKEN = '38712c15e4976ba5f4647e891f559271';
 const SHOPIFY_STORE = 'houseofsartorial.myshopify.com';
-const SHOPIFY_CLIENT_ID = '524ea8f7e4a654d449a5ab8aa6615528';
-const SHOPIFY_CLIENT_SECRET = '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';
-
-async function getShopifyToken() {
-  const res = await fetch(`https://${SHOPIFY_STORE}/admin/oauth/access_token`, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({
-      client_id: SHOPIFY_CLIENT_ID,
-      client_secret: SHOPIFY_CLIENT_SECRET,
-      grant_type: 'client_credentials'
-    })
-  });
-  const data = await res.json();
-  console.log('Token response:', JSON.stringify(data));
-  return data.access_token;
-}
+const SHOPIFY_TOKEN = process.env.SHOPIFY_TOKEN;
 
 async function getImagePrefix() {
   const res = await fetch(`${SUPPLIER_BASE_URL}/ApiV3/token/${SUPPLIER_TOKEN}`);
@@ -33,12 +17,12 @@ async function getProducts() {
   if (Array.isArray(data)) return data;
   if (data.products) return data.products;
   if (data.data) return data.data;
-  if (data.items) return data.items;
   const values = Object.values(data);
   if (values.length > 0 && typeof values[0] === 'object') return values;
   return [];
 }
-async function createShopifyProduct(product, imagePrefix, token) {
+
+async function createShopifyProduct(product, imagePrefix) {
   const variants = (product.available_size || []).map(size => ({
     option1: size.size,
     sku: size.stock_id,
@@ -75,7 +59,7 @@ async function createShopifyProduct(product, imagePrefix, token) {
   const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/products.json`, {
     method: 'POST',
     headers: {
-      'X-Shopify-Access-Token': token,
+      'X-Shopify-Access-Token': SHOPIFY_TOKEN,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
@@ -83,27 +67,22 @@ async function createShopifyProduct(product, imagePrefix, token) {
 
   const result = await res.json();
   if (result.product) {
-    console.log(`Creado: ${product.name}`);
+    console.log('Creado:', product.name);
   } else {
-    console.log(`Error en ${product.name}:`, JSON.stringify(result));
+    console.log('Error en', product.name, JSON.stringify(result));
   }
 }
 
 async function main() {
+  console.log('Token disponible:', SHOPIFY_TOKEN ? 'SI' : 'NO');
   console.log('Iniciando importacion...');
-  const token = await getShopifyToken();
-  if (!token) {
-    console.log('No se pudo obtener el token de Shopify');
-    return;
-  }
-  console.log('Token obtenido correctamente');
   const imagePrefix = await getImagePrefix();
   console.log('Image prefix:', imagePrefix);
   const products = await getProducts();
   console.log('Productos encontrados:', products.length);
 
   for (let i = 0; i < products.length; i++) {
-    await createShopifyProduct(products[i], imagePrefix, token);
+    await createShopifyProduct(products[i], imagePrefix);
     await new Promise(r => setTimeout(r, 500));
     if ((i + 1) % 10 === 0) console.log('Progreso:', (i + 1) + '/' + products.length);
   }
