@@ -1,9 +1,15 @@
 const fetch = (...args) => import('node-fetch').then(({default: f}) => f(...args));
+const http = require('http');
+const url = require('url');
 
 const SUPPLIER_BASE_URL = 'https://srv2.best-fashion.net';
 const SUPPLIER_TOKEN = '38712c15e4976ba5f4647e891f559271';
 const SHOPIFY_STORE = 'houseofsartorial.myshopify.com';
-const SHOPIFY_TOKEN = process.env.SHOPIFY_TOKEN;
+const CLIENT_ID = '524ea8f7e4a654d449a5ab8aa6615528';
+const CLIENT_SECRET = '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';
+const PORT = process.env.PORT || 3000;
+
+let shopifyToken = null;
 
 async function getImagePrefix() {
   const res = await fetch(`${SUPPLIER_BASE_URL}/ApiV3/token/${SUPPLIER_TOKEN}`);
@@ -59,7 +65,7 @@ async function createShopifyProduct(product, imagePrefix) {
   const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/products.json`, {
     method: 'POST',
     headers: {
-      'X-Shopify-Access-Token': SHOPIFY_TOKEN,
+      'X-Shopify-Access-Token': shopifyToken,
       'Content-Type': 'application/json'
     },
     body: JSON.stringify(body)
@@ -73,21 +79,42 @@ async function createShopifyProduct(product, imagePrefix) {
   }
 }
 
-async function main() {
-  console.log('Token disponible:', SHOPIFY_TOKEN ? 'SI' : 'NO');
+async function importProducts() {
   console.log('Iniciando importacion...');
   const imagePrefix = await getImagePrefix();
-  console.log('Image prefix:', imagePrefix);
   const products = await getProducts();
   console.log('Productos encontrados:', products.length);
-
   for (let i = 0; i < products.length; i++) {
     await createShopifyProduct(products[i], imagePrefix);
     await new Promise(r => setTimeout(r, 500));
     if ((i + 1) % 10 === 0) console.log('Progreso:', (i + 1) + '/' + products.length);
   }
-
   console.log('Importacion completada!');
 }
 
-main().catch(console.error);
+const server = http.createServer(async (req, res) => {
+  const parsed = url.parse(req.url, true);
+
+  if (parsed.pathname === '/callback') {
+    const code = parsed.query.code;
+    if (code) {
+      const tokenRes = await fetch(`https://${SHOPIFY_STORE}/admin/oauth/access_token`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ client_id: CLIENT_ID, client_secret: CLIENT_SECRET, code })
+      });
+      const tokenData = await tokenRes.json();
+      shopifyToken = tokenData.access_token;
+      console.log('Token obtenido:', shopifyToken);
+      res.writeHead(200, { 'Content-Type': 'text/html' });
+      res.end('<h1>Token obtenido! La importacion iniciara automaticamente.</h1>');
+      importProducts();
+    }
+  } else {
+    const authUrl = `https://${SHOPIFY_STORE}/admin/oauth/authorize?client_id=${CLIENT_ID}&scope=write_products,read_products,write_inventory,read_inventory,read_locations&redirect_uri=RAILWAY_URL/callback&state=abc123`;
+    res.writeHead(200, { 'Content-Type': 'text/html' });
+    res.end(`<h1>Importador Catalogo</h1><a href="${authUrl}" style="background:#008060;color:white;padding:15px 30px;text-decoration:none;border-radius:5px;">Autorizar e Importar</a>`);
+  }
+});
+
+server.listen(PORT, () => console.log('Servidor corriendo en puerto', PORT));
