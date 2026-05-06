@@ -31,8 +31,50 @@ async function createShopifyProduct(product, imagePrefix) {
     sku: size.stock_id,
     inventory_quantity: parseInt(size.qty) || 0,
     inventory_management: 'shopify',
-    price: product.price || '0.00'
+    price: product.price || product.default_price || '0.00'
   }));
+
+  if (variants.length === 0) {
+    variants.push({
+      price: product.price || product.default_price || '0.00',
+      inventory_management: 'shopify',
+      inventory_quantity: 0
+    });
+  }
+
+  const images = [];
+  if (product.pic1) images.push({ src: `${imagePrefix}${product.pic1}` });
+  if (product.pic2) images.push({ src: `${imagePrefix}${product.pic2}` });
+
+  const body = {
+    product: {
+      title: product.name,
+      body_html: product.description || '',
+      vendor: product.brand || '',
+      product_type: product.category || '',
+      tags: [product.department, product.season, product.color].filter(Boolean).join(', '),
+      options: [{ name: 'Size' }],
+      variants,
+      images
+    }
+  };
+
+  const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/products.json`, {
+    method: 'POST',
+    headers: {
+      'X-Shopify-Access-Token': SHOPIFY_TOKEN,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  const result = await res.json();
+  if (result.product) {
+    console.log(`✅ Creado: ${product.name}`);
+  } else {
+    console.log(`❌ Error en ${product.name}:`, JSON.stringify(result));
+  }
+}
 
   const images = [];
   if (product.pic1) images.push({ src: `https://${imagePrefix}${product.pic1}` });
