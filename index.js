@@ -14,12 +14,10 @@ async function getImagePrefix() {
 async function getProducts() {
   const res = await fetch(`${SUPPLIER_BASE_URL}/ApiV3/token/${SUPPLIER_TOKEN}/callType/allStockGroup`);
   const data = await res.json();
-  console.log('📊 Estructura de respuesta:', JSON.stringify(data).substring(0, 500));
   if (Array.isArray(data)) return data;
   if (data.products) return data.products;
   if (data.data) return data.data;
   if (data.items) return data.items;
-  // Si es un objeto con productos como valores
   const values = Object.values(data);
   if (values.length > 0 && typeof values[0] === 'object') return values;
   return [];
@@ -76,40 +74,6 @@ async function createShopifyProduct(product, imagePrefix) {
   }
 }
 
-  const images = [];
-  if (product.pic1) images.push({ src: `https://${imagePrefix}${product.pic1}` });
-  if (product.pic2) images.push({ src: `https://${imagePrefix}${product.pic2}` });
-
-  const body = {
-    product: {
-      title: product.name,
-      body_html: product.description || '',
-      vendor: product.brand || '',
-      product_type: product.category || '',
-      tags: [product.department, product.season, product.color].filter(Boolean).join(', '),
-      options: [{ name: 'Size' }],
-      variants,
-      images
-    }
-  };
-
-  const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/products.json`, {
-    method: 'POST',
-    headers: {
-      'X-Shopify-Access-Token': SHOPIFY_TOKEN,
-      'Content-Type': 'application/json'
-    },
-    body: JSON.stringify(body)
-  });
-
-  const result = await res.json();
-  if (result.product) {
-    console.log(`✅ Creado: ${product.name}`);
-  } else {
-    console.log(`❌ Error en ${product.name}:`, JSON.stringify(result.errors));
-  }
-}
-
 async function main() {
   console.log('🚀 Iniciando importación...');
   const imagePrefix = await getImagePrefix();
@@ -119,7 +83,7 @@ async function main() {
 
   for (let i = 0; i < products.length; i++) {
     await createShopifyProduct(products[i], imagePrefix);
-    await new Promise(r => setTimeout(r, 500)); // pausa para no saturar la API
+    await new Promise(r => setTimeout(r, 500));
     if ((i + 1) % 10 === 0) console.log(`⏳ Progreso: ${i + 1}/${products.length}`);
   }
 
