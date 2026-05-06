@@ -22,75 +22,66 @@ async function getProducts() {
   return [];
 }
 
-async function testShopifyConnection() {
+async function testToken() {
+  console.log('Token:', SHOPIFY_TOKEN ? SHOPIFY_TOKEN.substring(0, 10) + '...' : 'NO TOKEN');
   const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-10/shop.json`, {
     headers: { 'X-Shopify-Access-Token': SHOPIFY_TOKEN }
   });
-  const data = await res.json();
-  console.log('Shop test:', JSON.stringify(data).substring(0, 200));
-  return data.shop ? true : false;
+  const text = await res.text();
+  console.log('Shop response:', text.substring(0, 300));
 }
 
-async function createShopifyProduct(product, imagePrefix) {
-  const mutation = `
-    mutation productCreate($input: ProductInput!) {
-      productCreate(input: $input) {
-        product { id title }
-        userErrors { field message }
-      }
-    }
-  `;
-
+async function createProduct(product, imagePrefix) {
   const variants = (product.available_size || []).map(size => ({
-    optionValues: [{ name: size.size, optionName: 'Size' }],
+    option1: size.size,
     sku: size.stock_id,
-    inventoryQuantities: [{ availableQuantity: parseInt(size.qty) || 0, locationId: 'gid://shopify/Location/1' }],
+    inventory_quantity: parseInt(size.qty) || 0,
+    inventory_management: 'shopify',
     price: product.price || product.default_price || '0.00'
   }));
 
-  const input = {
-    title: product.name,
-    descriptionHtml: product.description || '',
-    vendor: product.brand || '',
-    productType: product.category || '',
-    tags: [product.department, product.season, product.color].filter(Boolean),
-  };
+  if (variants.length === 0) {
+    variants.push({ price: product.price || '0.00' });
+  }
 
-  const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-10/graphql.json`, {
+  const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2023-10/products.json`, {
     method: 'POST',
     headers: {
       'X-Shopify-Access-Token': SHOPIFY_TOKEN,
       'Content-Type': 'application/json'
     },
-    body: JSON.stringify({ query: mutation, variables: { input } })
+    body: JSON.stringify({
+      product: {
+        title: product.name,
+        body_html: product.description || '',
+        vendor: product.brand || '',
+        product_type: product.category || '',
+        options: [{ name: 'Size' }],
+        variants
+      }
+    })
   });
 
   const result = await res.json();
-  if (result.data && result.data.productCreate && result.data.productCreate.product) {
-    console.log('Creado:', product.name);
+  if (result.product) {
+    console.log('OK:', product.name);
   } else {
-    console.log('Error en', product.name, JSON.stringify(result));
+    console.log('ERR:', product.name, JSON.stringify(result).substring(0, 100));
   }
 }
 
 async function main() {
-  console.log('Probando conexion con Shopify...');
-  const connected = await testShopifyConnection();
-  if (!connected) {
-    console.log('ERROR: No se pudo conectar con Shopify. Verifica el token.');
-    return;
-  }
-  console.log('Conexion exitosa!');
+  console.log('=== INICIANDO ===');
+  await testToken();
   const imagePrefix = await getImagePrefix();
   const products = await getProducts();
-  console.log('Productos encontrados:', products.length);
-
-  for (let i = 0; i < products.length; i++) {
-    await createShopifyProduct(products[i], imagePrefix);
-    await new Promise(r => setTimeout(r, 500));
-    if ((i + 1) % 10 === 0) console.log('Progreso:', (i + 1) + '/' + products.length);
+  console.log('Total productos:', products.length);
+  for (let i = 0; i < Math.min(products.length, 5); i++) {
+    await createProduct(products[i], imagePrefix);
+    await new Promise(r => setTimeout(r, 1000));
   }
-  console.log('Importacion completada!');
+  console.log('=== PRUEBA COMPLETADA ===');
+  process.exit(0);
 }
 
-main().catch(console.error);
+main().catch(e => { console.error(e); process.exit(1); });
