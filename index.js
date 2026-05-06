@@ -17,7 +17,7 @@ async function getShopifyToken() {
     })
   });
   const data = await res.json();
-  console.log('🔑 Token response:', JSON.stringify(data));
+  console.log('Token response:', JSON.stringify(data));
   return data.access_token;
 }
 
@@ -38,7 +38,6 @@ async function getProducts() {
   if (values.length > 0 && typeof values[0] === 'object') return values;
   return [];
 }
-
 async function createShopifyProduct(product, imagePrefix, token) {
   const variants = (product.available_size || []).map(size => ({
     option1: size.size,
@@ -66,4 +65,50 @@ async function createShopifyProduct(product, imagePrefix, token) {
       body_html: product.description || '',
       vendor: product.brand || '',
       product_type: product.category || '',
-      tags
+      tags: [product.department, product.season, product.color].filter(Boolean).join(', '),
+      options: [{ name: 'Size' }],
+      variants,
+      images
+    }
+  };
+
+  const res = await fetch(`https://${SHOPIFY_STORE}/admin/api/2024-01/products.json`, {
+    method: 'POST',
+    headers: {
+      'X-Shopify-Access-Token': token,
+      'Content-Type': 'application/json'
+    },
+    body: JSON.stringify(body)
+  });
+
+  const result = await res.json();
+  if (result.product) {
+    console.log(`Creado: ${product.name}`);
+  } else {
+    console.log(`Error en ${product.name}:`, JSON.stringify(result));
+  }
+}
+
+async function main() {
+  console.log('Iniciando importacion...');
+  const token = await getShopifyToken();
+  if (!token) {
+    console.log('No se pudo obtener el token de Shopify');
+    return;
+  }
+  console.log('Token obtenido correctamente');
+  const imagePrefix = await getImagePrefix();
+  console.log('Image prefix:', imagePrefix);
+  const products = await getProducts();
+  console.log('Productos encontrados:', products.length);
+
+  for (let i = 0; i < products.length; i++) {
+    await createShopifyProduct(products[i], imagePrefix, token);
+    await new Promise(r => setTimeout(r, 500));
+    if ((i + 1) % 10 === 0) console.log('Progreso:', (i + 1) + '/' + products.length);
+  }
+
+  console.log('Importacion completada!');
+}
+
+main().catch(console.error);
