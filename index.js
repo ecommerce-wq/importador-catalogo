@@ -111,7 +111,7 @@ const server = http.createServer(async (req, res) => {
       importProducts();
     }
   } else {
-    const authUrl = `https://${SHOPIFY_STORE}/admin/oauth/authorize?client_id=${CLIENT_ID}&scope=write_products,read_products,write_inventory,read_inventory,read_locations&redirect_uri=RAILWAY_URL/callback&state=abc123`;
+    const authUrl = `https://${SHOPIFY_STORE}/admin/oauth/authorize?client_id=${CLIENT_ID}&scope=write_products,read_products,write_inventory,read_inventory,read_locations&redirect_uri=https://worker-production-1d00.up.railway.app/callback&state=abc123`;
     res.writeHead(200, { 'Content-Type': 'text/html' });
     res.end(`<h1>Importador Catalogo</h1><a href="${authUrl}" style="background:#008060;color:white;padding:15px 30px;text-decoration:none;border-radius:5px;">Autorizar e Importar</a>`);
   }
