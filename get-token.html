@@ -1,0 +1,45 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <title>Obtener Token Shopify</title>
+  <style>
+    body { font-family: Arial, sans-serif; max-width: 600px; margin: 50px auto; padding: 20px; }
+    button { background: #008060; color: white; padding: 15px 30px; border: none; border-radius: 5px; font-size: 16px; cursor: pointer; }
+    .token-box { background: #f0f0f0; padding: 15px; border-radius: 5px; word-break: break-all; margin-top: 20px; }
+  </style>
+</head>
+<body>
+  <h1>Obtener Token de Shopify</h1>
+  <p>Haz click en el botón para autorizar la app y obtener tu token.</p>
+  <button onclick="authorize()">Autorizar App en Shopify</button>
+  <div id="result"></div>
+
+  <script>
+    const CLIENT_ID = '524ea8f7e4a654d449a5ab8aa6615528';
+    const SHOP = 'houseofsartorial.myshopify.com';
+    const SCOPES = 'write_products,read_products,write_inventory,read_inventory,read_locations';
+    const REDIRECT_URI = window.location.href.split('?')[0];
+
+    function authorize() {
+      const state = Math.random().toString(36).substring(2);
+      localStorage.setItem('oauth_state', state);
+      const url = `https://${SHOP}/admin/oauth/authorize?client_id=${CLIENT_ID}&scope=${SCOPES}&redirect_uri=${encodeURIComponent(REDIRECT_URI)}&state=${state}`;
+      window.location.href = url;
+    }
+
+    // Verificar si venimos de Shopify con un código
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    const state = params.get('state');
+
+    if (code && state) {
+      document.getElementById('result').innerHTML = `
+        <h2>Codigo obtenido!</h2>
+        <p>Copia este codigo y enviaselo a Claude:</p>
+        <div class="token-box"><strong>CODE:</strong> ${code}</div>
+        <p>Con este codigo Claude puede obtener tu token final.</p>
+      `;
+    }
+  </script>
+</body>
+</html>
