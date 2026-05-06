@@ -14,7 +14,15 @@ async function getImagePrefix() {
 async function getProducts() {
   const res = await fetch(`${SUPPLIER_BASE_URL}/ApiV3/token/${SUPPLIER_TOKEN}/callType/allStockGroup`);
   const data = await res.json();
-  return Array.isArray(data) ? data : Object.values(data);
+  console.log('📊 Estructura de respuesta:', JSON.stringify(data).substring(0, 500));
+  if (Array.isArray(data)) return data;
+  if (data.products) return data.products;
+  if (data.data) return data.data;
+  if (data.items) return data.items;
+  // Si es un objeto con productos como valores
+  const values = Object.values(data);
+  if (values.length > 0 && typeof values[0] === 'object') return values;
+  return [];
 }
 
 async function createShopifyProduct(product, imagePrefix) {
